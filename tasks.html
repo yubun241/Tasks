@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>Tasks - Matrix Board</title>
+    <style>
+        :root {
+            --border-color: #cbd5e0;
+            --color-doing: #3b82f6;     /* 進行中: 青 */
+            --color-pending: #ef4444;   /* ペンディング: 赤 */
+            --color-later: #f59e0b;     /* 後回し: オレンジ */
+            --color-todo: #94a3b8;      /* 手つかず: グレー */
+            --color-done: #22c55e;      /* 完了: 緑 */
+            --unit-text: white;
+            --header-dark: #1e293b;
+        }
+
+        body { font-family: "Helvetica Neue", Arial, sans-serif; margin: 20px; background-color: #f1f5f9; color: #334155; }
+        
+        /* タイトル表示 */
+        .app-title {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--header-dark);
+            margin-bottom: 20px;
+            letter-spacing: -0.025em;
+        }
+
+        /* 入力フォーム */
+        .controls { 
+            background: white; padding: 20px; border-radius: 12px 12px 0 0;
+            display: flex; gap: 15px; align-items: flex-end; box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        label { font-size: 0.75rem; font-weight: bold; color: #64748b; }
+        input { padding: 8px; border: 1px solid #e2e8f0; border-radius: 6px; }
+        button.add-btn { padding: 8px 24px; background: var(--header-dark); color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+
+        .legend {
+            background: #fff; padding: 10px 20px; border-top: 1px solid #eee; border-radius: 0 0 12px 12px;
+            display: flex; gap: 20px; font-size: 0.8rem; color: #475569; margin-bottom: 25px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .color-box { width: 14px; height: 14px; border-radius: 3px; }
+        
+        .table-wrapper { background: white; border-radius: 12px; overflow-x: auto; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .matrix-table { border-collapse: collapse; width: 100%; min-width: 1200px; table-layout: fixed; }
+        .matrix-table th, .matrix-table td { border: 1px solid var(--border-color); padding: 12px; vertical-align: top; }
+        
+        th { background: #f8fafc; font-weight: bold; font-size: 0.85rem; height: 40px; color: #475569; }
+        .col-proj { width: 180px; }
+        .col-progress { width: 100px; text-align: center; }
+
+        .progress-input { width: 50px; padding: 4px; font-size: 1rem; font-weight: bold; text-align: center; border: 1px solid #cbd5e0; border-radius: 4px; }
+
+        .drop-zone { display: flex; flex-direction: row; flex-wrap: wrap; gap: 8px; min-height: 80px; align-items: center; }
+        .drop-zone.drag-over { background-color: #f0f7ff; outline: 2px dashed #3b82f6; border-radius: 8px; }
+
+        .unit-block {
+            flex: 0 0 100px; height: 55px;
+            color: var(--unit-text); border-radius: 8px; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            cursor: grab; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            font-size: 0.7rem; padding: 4px; box-sizing: border-box; text-align: center;
+            transition: transform 0.1s;
+        }
+        .unit-block:active { cursor: grabbing; transform: scale(0.95); }
+
+        .st-doing { background-color: var(--color-doing); }
+        .st-pending { background-color: var(--color-pending); }
+        .st-later { background-color: var(--color-later); }
+        .st-todo { background-color: var(--color-todo); }
+        .st-done { background-color: var(--color-done); }
+
+        .unit-task-name { font-weight: bold; margin-bottom: 2px; width: 100%; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+        .unit-time { font-size: 0.75rem; opacity: 0.9; border-top: 1px solid rgba(255,255,255,0.2); width: 100%; padding-top: 2px; }
+
+        .btn-del { font-size: 0.7rem; color: #94a3b8; cursor: pointer; border: none; background: none; margin-bottom: 5px; }
+        .btn-del:hover { color: #ef4444; }
+    </style>
+</head>
+<body>
+
+<!-- タイトルを追加 -->
+<h1 class="app-title">Tasks</h1>
+
+<div class="controls">
+    <div class="input-group">
+        <label>プロジェクト名</label>
+        <input type="text" id="in-proj" placeholder="プロジェクト名を入力">
+    </div>
+    <div class="input-group">
+        <label>タスク内容</label>
+        <input type="text" id="in-task" placeholder="タスクの内容を入力">
+    </div>
+    <div class="input-group">
+        <label>合計工数(h)</label>
+        <input type="number" id="in-hours" value="0.5" step="0.5" min="0.5" style="width: 75px;">
+    </div>
+    <button class="add-btn" onclick="addEntry()">投入</button>
+</div>
+
+<div class="legend">
+    <div class="legend-item"><strong>Status:</strong></div>
+    <div class="legend-item"><div class="color-box" style="background:var(--color-todo)"></div> 手つかず</div>
+    <div class="legend-item"><div class="color-box" style="background:var(--color-doing)"></div> 進行中</div>
+    <div class="legend-item"><div class="color-box" style="background:var(--color-pending)"></div> ペンディング</div>
+    <div class="legend-item"><div class="color-box" style="background:var(--color-later)"></div> 後回し</div>
+    <div class="legend-item"><div class="color-box" style="background:var(--color-done)"></div> 完了</div>
+    <div style="flex-grow:1"></div>
+    <div class="legend-item" style="color:#64748b; font-size: 0.7rem;">※右クリックでStatus変更 / ドラッグで工程移動</div>
+</div>
+
+<div class="table-wrapper">
+    <table class="matrix-table">
+        <thead>
+            <tr>
+                <th class="col-proj">プロジェクト</th>
+                <th class="col-progress">進捗率(%)</th>
+                <th>調査</th>
+                <th>企画</th>
+                <th>開発</th>
+                <th>評価</th>
+                <th>完了</th>
+            </tr>
+        </thead>
+        <tbody id="board-body"></tbody>
+    </table>
+</div>
+
+<script>
+    const PHASES = ["調査", "企画", "開発", "評価", "完了"];
+    const STATUSES = ["doing", "pending", "later", "todo"]; 
+    const UNIT_H = 0.5;
+
+    let projects = JSON.parse(localStorage.getItem('matrix-tasks-final-v1')) || [];
+    let draggedInfo = null;
+
+    function addEntry() {
+        const pName = document.getElementById('in-proj').value.trim();
+        const tName = document.getElementById('in-task').value.trim();
+        const hours = parseFloat(document.getElementById('in-hours').value) || 0;
+
+        if (!pName || !tName || hours <= 0) return;
+
+        const unitCount = Math.round(hours / UNIT_H);
+        let proj = projects.find(p => p.name === pName);
+
+        if (!proj) {
+            proj = { id: Date.now(), name: pName, progress: 0, units: [] };
+            projects.push(proj);
+        }
+
+        for (let i = 0; i < unitCount; i++) {
+            proj.units.push({
+                id: Math.random().toString(36).substr(2, 9),
+                taskName: tName,
+                phase: "調査",
+                status: "todo"
+            });
+        }
+        save();
+        document.getElementById('in-task').value = '';
+    }
+
+    function toggleStatus(projId, unitId, e) {
+        e.preventDefault(); 
+        const proj = projects.find(p => p.id === projId);
+        const unit = proj.units.find(u => u.id === unitId);
+        const currentIdx = STATUSES.indexOf(unit.status);
+        const nextIdx = (currentIdx + 1) % STATUSES.length;
+        unit.status = STATUSES[nextIdx];
+        save();
+    }
+
+    function save() {
+        localStorage.setItem('matrix-tasks-final-v1', JSON.stringify(projects));
+        render();
+    }
+
+    function updateProgress(id, value) {
+        projects.find(p => p.id === id).progress = value;
+        localStorage.setItem('matrix-tasks-final-v1', JSON.stringify(projects));
+    }
+
+    function deleteProject(id) {
+        if(confirm("プロジェクトを削除しますか？")) { projects = projects.filter(p => p.id !== id); save(); }
+    }
+
+    function onDragStart(projId, unitId) { draggedInfo = { projId, unitId }; }
+    function onDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+    function onDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+    function onDrop(e, phase, projId) {
+        e.preventDefault();
+        e.currentTarget.classList.remove('drag-over');
+        if (!draggedInfo || draggedInfo.projId !== projId) return;
+        const proj = projects.find(p => p.id === projId);
+        const unit = proj.units.find(u => u.id === draggedInfo.unitId);
+        unit.phase = phase;
+        save();
+    }
+
+    function render() {
+        const tbody = document.getElementById('board-body');
+        tbody.innerHTML = '';
+
+        projects.forEach(proj => {
+            const tr = document.createElement('tr');
+            const tdName = document.createElement('td');
+            tdName.innerHTML = `<button class="btn-del" onclick="deleteProject(${proj.id})">✖ 削除</button><br><strong>${proj.name}</strong>`;
+            tr.appendChild(tdName);
+
+            const tdProgress = document.createElement('td');
+            tdProgress.className = 'col-progress';
+            const progInp = document.createElement('input');
+            progInp.type = "number";
+            progInp.className = 'progress-input';
+            progInp.value = proj.progress;
+            progInp.oninput = (e) => updateProgress(proj.id, e.target.value);
+            tdProgress.appendChild(progInp);
+            tdProgress.innerHTML += `%`;
+            const actualInp = tdProgress.querySelector('input');
+            actualInp.oninput = (e) => updateProgress(proj.id, e.target.value);
+            tr.appendChild(tdProgress);
+
+            PHASES.forEach(phase => {
+                const td = document.createElement('td');
+                const zone = document.createElement('div');
+                zone.className = 'drop-zone';
+                zone.ondragover = onDragOver;
+                zone.ondragleave = onDragLeave;
+                zone.ondrop = (e) => onDrop(e, phase, proj.id);
+
+                proj.units.filter(u => u.phase === phase).forEach(u => {
+                    const block = document.createElement('div');
+                    let colorClass = `st-${u.status}`;
+                    if (phase === "完了") colorClass = "st-done";
+                    
+                    block.className = `unit-block ${colorClass}`;
+                    block.draggable = true;
+                    block.ondragstart = () => onDragStart(proj.id, u.id);
+                    block.oncontextmenu = (e) => toggleStatus(proj.id, u.id, e);
+                    
+                    block.innerHTML = `
+                        <span class="unit-task-name">${u.taskName}</span>
+                        <span class="unit-time">0.5H</span>
+                    `;
+                    zone.appendChild(block);
+                });
+                td.appendChild(zone);
+                tr.appendChild(td);
+            });
+            tbody.appendChild(tr);
+        });
+    }
+
+    render();
+</script>
+
+</body>
+</html>
